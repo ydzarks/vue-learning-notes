@@ -27,7 +27,10 @@ function track(target: any, key: ValueKey) {
   if (!effects) {
     depsMap.set(key, (effects = new Set<EffectFn>()))
   }
+
+  // 互相关联，这样能够获取到对方并作进一步处理
   effects.add(activeEffectFn)
+  activeEffectFn.deps.push(effects)
 }
 
 function trigger(target: any, key: ValueKey) {
@@ -38,7 +41,16 @@ function trigger(target: any, key: ValueKey) {
 
   const effects = depsMap.get(key)
 
+  // 解决cleanup带来的循环触发死循环
+  const effectsToRun = new Set<EffectFn>()
+
   effects && effects.forEach((effectFn) => {
+    if (effectFn !== activeEffectFn) {
+      effectsToRun.add(effectFn)
+    }
+  })
+
+  effectsToRun.forEach((effectFn) => {
     effectFn()
   })
 }
