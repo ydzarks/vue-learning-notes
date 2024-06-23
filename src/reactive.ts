@@ -52,6 +52,12 @@ function trigger(target: any, key: ValueKey) {
   })
 
   effectsToRun.forEach((effectFn) => {
-    effectFn()
+    const scheduler = effectFn.options.scheduler
+    if (scheduler) {
+      scheduler(effectFn)
+    }
+    else {
+      effectFn()
+    }
   })
 }

@@ -88,4 +88,19 @@ describe('基础响应式能力测试', () => {
     observed.foo++
     expect(observed.foo).toBe(4)
   })
+
+  it('调度执行', () => {
+    const original = { foo: 1 }
+    const observed = createReactive(original)
+    let count = 0
+    createEffect(() => { observed.foo }, {
+      scheduler: (effect) => {
+        count += 1
+        effect()
+      },
+    })
+    expect(count).toBe(0)
+    observed.foo = 2
+    expect(count).toBe(1)
+  })
 })

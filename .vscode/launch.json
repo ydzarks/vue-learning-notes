@@ -15,8 +15,8 @@
       ],
       "program": "${workspaceRoot}/node_modules/vitest/vitest.mjs",
       "args": [
-        // "run"
-        // "${relativeFile}"
+        "run",
+        "${relativeFile}"
       ],
       "smartStep": true,
       "console": "integratedTerminal"
