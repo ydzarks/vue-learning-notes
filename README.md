@@ -1,1 +1,1 @@
-# vue-learning-notes
+# 基于《Vue.JS设计与实现》的跟写实现笔记

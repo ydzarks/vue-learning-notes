@@ -1,0 +1,31 @@
+{
+  "name": "vue-learning-notes",
+  "type": "module",
+  "version": "0.0.1",
+  "description": "",
+  "author": "",
+  "keywords": [],
+  "scripts": {
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^2.21.1",
+    "@types/node": "^20.12.12",
+    "eslint": "^9.5.0",
+    "eslint-plugin-format": "^0.1.2",
+    "typescript": "^5.5.2",
+    "vitest": "^1.6.0"
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "typescript-eslint>eslint": "^9.0.0",
+        "@typescript-eslint/eslint-plugin>eslint": "^9.0.0",
+        "@typescript-eslint/parser>eslint": "^9.0.0",
+        "@typescript-eslint/type-utils>eslint": "^9.0.0",
+        "@typescript-eslint/utils>eslint": "^9.0.0",
+        "eslint-plugin-unused-imports>eslint": "^9.0.0"
+      }
+    }
+  }
+}
