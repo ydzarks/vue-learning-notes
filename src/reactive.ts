@@ -1,17 +1,51 @@
 import type { EffectFn, ValueKey } from './effect'
 import { Bucket, activeEffectFn } from './effect'
+import { hasOwn } from './utils'
+
+enum TriggerType {
+  ADD = 'ADD',
+  SET = 'SET',
+  DELETE = 'DELETE',
+}
+const ITERATE_KEY = Symbol('effectKey')
 
 export function createReactive(data: any) {
   return new Proxy(data, {
+    set(target, key, newValue, receiver) {
+      const type = hasOwn(target, key) ? TriggerType.SET : TriggerType.ADD
+      const result = Reflect.set(target, key, newValue, receiver)
+      trigger(target, key, type)
+      return result
+    },
+    // delete操作符识别
+    deleteProperty(target, property) {
+      // 要删除的属性是否存在
+      const hadKey = hasOwn(target, property)
+      const res = Reflect.deleteProperty(target, property)
+
+      // 只有成功删除自己的属性才触发更新
+      if (res && hadKey) {
+        trigger(target, property, TriggerType.DELETE)
+      }
+
+      return res
+    },
+
     get(target, key, receiver) {
       track(target, key)
       return Reflect.get(target, key, receiver)
     },
-    set(target, key, newValue, receiver) {
-      const result = Reflect.set(target, key, newValue, receiver)
-      trigger(target, key)
-      return result
+    // 对象in操作符识别，基于ECMA-262规范13.10.1节，in操作符的运算结果是基于HasProperty抽象方法获得
+    has(target, key) {
+      track(target, key)
+      return Reflect.has(target, key)
     },
+    // for...in操作符识别
+    ownKeys(target) {
+      track(target, ITERATE_KEY)
+      return Reflect.ownKeys(target)
+    },
+
   })
 }
 
@@ -33,12 +67,13 @@ function track(target: any, key: ValueKey) {
   activeEffectFn.deps.push(effects)
 }
 
-function trigger(target: any, key: ValueKey) {
+function trigger(target: any, key: ValueKey, type: TriggerType) {
   const depsMap = Bucket.get(target)
   if (!depsMap) {
     return false
   }
 
+  // 与target中属性key相关连的副作用函数
   const effects = depsMap.get(key)
 
   // 解决cleanup带来的循环触发死循环
@@ -50,6 +85,16 @@ function trigger(target: any, key: ValueKey) {
       effectsToRun.add(effectFn)
     }
   })
+
+  if (TriggerType.ADD === type || TriggerType.DELETE === type) {
+    // 与ITERATE_KEY相关连的副作用函数
+    const iterateEffects = depsMap.get(ITERATE_KEY)
+    iterateEffects && iterateEffects.forEach((effectFn) => {
+      if (effectFn !== activeEffectFn) {
+        effectsToRun.add(effectFn)
+      }
+    })
+  }
 
   effectsToRun.forEach((effectFn) => {
     const scheduler = effectFn.options.scheduler
