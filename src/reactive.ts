@@ -1,3 +1,4 @@
+import type { EffectFn, ValueKey } from './effect'
 import { Bucket, activeEffectFn } from './effect'
 
 export function createReactive(data: any) {
@@ -6,55 +7,38 @@ export function createReactive(data: any) {
       track(target, key)
       return Reflect.get(target, key, receiver)
     },
-    set(target, key, receiver) {
-      const result = Reflect.set(target, key, receiver)
+    set(target, key, newValue, receiver) {
+      const result = Reflect.set(target, key, newValue, receiver)
       trigger(target, key)
       return result
     },
   })
 }
 
-/**
- * 依赖收集
- * @param target
- * @param key
- */
-function track(target: any, key: string | symbol) {
-  if (activeEffectFn) {
-    let depMap = Bucket.get(target)
-    if (!depMap) {
-      Bucket.set(target, (depMap = new Map<string | symbol, Set<Function>>()))
-    }
-    let effects = depMap.get(key)
-    if (!effects) {
-      depMap.set(key, (effects = new Set<Function>()))
-    }
-    effects.add(activeEffectFn)
-    activeEffectFn.deps.push(effects)
+function track(target: any, key: ValueKey) {
+  if (!activeEffectFn)
+    return
+  let depsMap = Bucket.get(target)
+  if (!depsMap) {
+    // 不存在目标依赖集合的情况时，初始化
+    Bucket.set(target, (depsMap = new Map<ValueKey, Set<EffectFn>>()))
   }
+  let effects = depsMap.get(key)
+  if (!effects) {
+    depsMap.set(key, (effects = new Set<EffectFn>()))
+  }
+  effects.add(activeEffectFn)
 }
 
-/**
- * 响应
- * @param target
- * @param key
- */
-function trigger(target: any, key: string | symbol) {
-  let depMap = Bucket.get(target)
-  if (!depMap) {
-    Bucket.set(target, (depMap = new Map<string | symbol, Set<Function>>()))
+function trigger(target: any, key: ValueKey) {
+  const depsMap = Bucket.get(target)
+  if (!depsMap) {
+    return false
   }
-  let effects = depMap.get(key)
-  if (!effects) {
-    depMap.set(key, (effects = new Set<Function>()))
-  }
-  const effectsToRun = new Set<Function>()
+
+  const effects = depsMap.get(key)
 
   effects && effects.forEach((effectFn) => {
-    effectsToRun.add(effectFn)
-  })
-
-  effectsToRun.forEach((fn) => {
-    fn()
+    effectFn()
   })
 }
