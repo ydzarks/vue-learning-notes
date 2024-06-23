@@ -45,6 +45,7 @@ function trigger(target: any, key: ValueKey) {
   const effectsToRun = new Set<EffectFn>()
 
   effects && effects.forEach((effectFn) => {
+    // 解决递归循环 副作用函数内部再次修改内容
     if (effectFn !== activeEffectFn) {
       effectsToRun.add(effectFn)
     }

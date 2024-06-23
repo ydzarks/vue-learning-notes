@@ -65,6 +65,8 @@ describe('基础响应式能力测试', () => {
       expect(fn2Count).toBe(1)
     })
 
+    // 如果先修改foo，这样fn2Count就为2，因为fn1又创建了新的副作用函数
+
     it('修改bar时只有fn2执行一次', () => {
       fn1Count = 0
       fn2Count = 0
@@ -72,5 +74,18 @@ describe('基础响应式能力测试', () => {
       expect(fn1Count).toBe(0)
       expect(fn2Count).toBe(1)
     })
+  })
+
+  it('避免无限递归循环', () => {
+    const original = { foo: 1 }
+    const observed = createReactive(original)
+
+    createEffect(() => {
+      observed.foo++
+    })
+
+    expect(observed.foo).toBe(2)
+    observed.foo++
+    expect(observed.foo).toBe(4)
   })
 })
