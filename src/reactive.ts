@@ -8,13 +8,23 @@ enum TriggerType {
   DELETE = 'DELETE',
 }
 const ITERATE_KEY = Symbol('effectKey')
+const RAW = Symbol('raw')
 
 export function createReactive(data: any) {
   return new Proxy(data, {
     set(target, key, newValue, receiver) {
+      const oldValue = Reflect.get(target, key)
       const type = hasOwn(target, key) ? TriggerType.SET : TriggerType.ADD
       const result = Reflect.set(target, key, newValue, receiver)
-      trigger(target, key, type)
+
+      // 利用约定的RAW判断当前设置的是否是原始属性
+      if (target === receiver[RAW]) {
+        // eslint-disable-next-line no-self-compare
+        if (oldValue !== newValue && (oldValue === oldValue || newValue === newValue)) {
+          trigger(target, key, type)
+        }
+      }
+
       return result
     },
     // delete操作符识别
@@ -32,6 +42,10 @@ export function createReactive(data: any) {
     },
 
     get(target, key, receiver) {
+      // 约定一个特殊的RAW Symbol属性来访问原始数据
+      if (key === RAW) {
+        return target
+      }
       track(target, key)
       return Reflect.get(target, key, receiver)
     },

@@ -1,4 +1,4 @@
-import { describe, expect, it, suite } from 'vitest'
+import { describe, expect, it, suite, vi } from 'vitest'
 
 import { createReactive } from '../reactive'
 import { createEffect } from '../effect'
@@ -111,5 +111,41 @@ describe('基础响应式能力测试', () => {
     expect(count).toBe(0)
     observed.foo = 2
     expect(count).toBe(1)
+  })
+
+  suite('合理的触发响应', () => {
+    const original = { foo: 1 }
+    const observed = createReactive(original)
+
+    it('数据值实际没有发生变化不触发', () => {
+      const fnSpy = vi.fn(() => observed.foo)
+      createEffect(fnSpy)
+      expect(fnSpy).toBeCalledTimes(1)
+      observed.foo = 1
+      expect(fnSpy).toBeCalledTimes(1)
+    })
+
+    it('值为NAN的情况', () => {
+      const fnSpy = vi.fn(() => observed.foo)
+      observed.foo = Number.NaN
+      createEffect(fnSpy)
+      expect(fnSpy).toBeCalledTimes(1)
+      observed.foo = Number.NaN
+      expect(fnSpy).toBeCalledTimes(1)
+    })
+
+    it('原型链继承', () => {
+      observed.foo = 1
+      const child = {}
+      const childOb = createReactive(child)
+      Object.setPrototypeOf(childOb, observed)
+      const fnSpy = vi.fn(() => childOb.foo)
+      createEffect(fnSpy)
+      expect(fnSpy).toBeCalledTimes(1)
+      childOb.foo = 2
+      expect(observed.foo).toBe(1)
+      expect(childOb.foo).toBe(2)
+      expect(fnSpy).toBeCalledTimes(2)
+    })
   })
 })
