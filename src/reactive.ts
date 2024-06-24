@@ -9,6 +9,7 @@ enum TriggerType {
 }
 const ITERATE_KEY = Symbol('effectKey')
 const RAW = Symbol('raw')
+const ARRAY_LENGTH = 'length'
 
 export function reactive(data: any) {
   return createReactive(data, false, false)
@@ -35,14 +36,18 @@ export function createReactive(data: any, isShallow = false, isReadonly = false)
       }
 
       const oldValue = Reflect.get(target, key)
-      const type = hasOwn(target, key) ? TriggerType.SET : TriggerType.ADD
+
+      const type = Array.isArray(target)
+        ? Number(key) < Reflect.get(target, ARRAY_LENGTH) ? TriggerType.SET : TriggerType.ADD
+        : hasOwn(target, key) ? TriggerType.SET : TriggerType.ADD
+
       const result = Reflect.set(target, key, newValue, receiver)
 
       // 利用约定的RAW判断当前设置的是否是原始属性
       if (target === receiver[RAW]) {
         // eslint-disable-next-line no-self-compare
         if (oldValue !== newValue && (oldValue === oldValue || newValue === newValue)) {
-          trigger(target, key, type)
+          trigger(target, key, type, newValue)
         }
       }
 
@@ -121,7 +126,7 @@ function track(target: any, key: ValueKey) {
   activeEffectFn.deps.push(effects)
 }
 
-function trigger(target: any, key: ValueKey, type: TriggerType) {
+function trigger(target: any, key: ValueKey, type: TriggerType, newValue?: any) {
   const depsMap = Bucket.get(target)
   if (!depsMap) {
     return false
@@ -146,6 +151,28 @@ function trigger(target: any, key: ValueKey, type: TriggerType) {
     iterateEffects && iterateEffects.forEach((effectFn) => {
       if (effectFn !== activeEffectFn) {
         effectsToRun.add(effectFn)
+      }
+    })
+  }
+
+  // 确保数组的正确触发
+  if (TriggerType.ADD === type && Array.isArray(target)) {
+    const lengthEffects = depsMap.get(ARRAY_LENGTH)
+    lengthEffects && lengthEffects.forEach((effectFn) => {
+      if (effectFn !== activeEffectFn) {
+        effectsToRun.add(effectFn)
+      }
+    })
+  }
+
+  if (Array.isArray(target) && key === ARRAY_LENGTH) {
+    depsMap.forEach((effects, key) => {
+      if ((key as unknown as number) >= newValue as unknown as number) {
+        effects.forEach((effectFn) => {
+          if (effectFn !== activeEffectFn) {
+            effectsToRun.add(effectFn)
+          }
+        })
       }
     })
   }
