@@ -11,8 +11,39 @@ const ITERATE_KEY = Symbol('effectKey')
 const RAW = Symbol('raw')
 const ARRAY_LENGTH = 'length'
 
+// 这个的存储一方面是为了解决isReadonly每次读取时都会生成新的对象
+// 另外是否也是为了性能的考虑
+const REACTIVE_MAP = new Map()
+
+let shouldTrack = true
+const arrayInstrumentations = {}
+;['includes', 'indexOf', 'lastIndexOf'].forEach((method) => {
+  const originMethod = Array.prototype[method]
+  arrayInstrumentations[method] = function (...args) {
+    let res = originMethod.apply(this, args)
+    if (res === false || res === -1) {
+      res = originMethod.apply(this[RAW], args)
+    }
+    return res
+  }
+})
+;['push', 'pop', 'shift', 'unshift', 'splice'].forEach((method) => {
+  const originMethod = Array.prototype[method]
+  arrayInstrumentations[method] = function (...args) {
+    shouldTrack = false
+    const res = originMethod.apply(this, args)
+    shouldTrack = true
+    return res
+  }
+})
+
 export function reactive(data: any) {
-  return createReactive(data, false, false)
+  const existionProxy = REACTIVE_MAP.get(data)
+  if (existionProxy)
+    return existionProxy
+  const proxy = createReactive(data, false, false)
+  REACTIVE_MAP.set(data, proxy)
+  return proxy
 }
 
 export function shallowReactive(data: any) {
@@ -78,7 +109,11 @@ export function createReactive(data: any, isShallow = false, isReadonly = false)
         return target
       }
 
-      if (!isReadonly) {
+      if (Array.isArray(target) && Object.prototype.hasOwnProperty.call(arrayInstrumentations, key)) {
+        return Reflect.get(arrayInstrumentations, key, receiver)
+      }
+
+      if (!isReadonly && typeof key !== 'symbol') {
         track(target, key)
       }
 
@@ -101,7 +136,7 @@ export function createReactive(data: any, isShallow = false, isReadonly = false)
     },
     // for...in操作符识别
     ownKeys(target) {
-      track(target, ITERATE_KEY)
+      track(target, Array.isArray(target) ? ARRAY_LENGTH : ITERATE_KEY)
       return Reflect.ownKeys(target)
     },
 
@@ -109,7 +144,7 @@ export function createReactive(data: any, isShallow = false, isReadonly = false)
 }
 
 function track(target: any, key: ValueKey) {
-  if (!activeEffectFn)
+  if (!activeEffectFn || !shouldTrack)
     return
   let depsMap = Bucket.get(target)
   if (!depsMap) {
