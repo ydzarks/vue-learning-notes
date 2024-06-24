@@ -1,6 +1,6 @@
 import { describe, expect, it, suite, vi } from 'vitest'
 
-import { createReactive } from '../reactive'
+import { createReactive, readonly, shallowReactive } from '../reactive'
 import { createEffect } from '../effect'
 
 describe('基础响应式能力测试', () => {
@@ -146,6 +146,41 @@ describe('基础响应式能力测试', () => {
       expect(observed.foo).toBe(1)
       expect(childOb.foo).toBe(2)
       expect(fnSpy).toBeCalledTimes(2)
+    })
+  })
+
+  suite('浅响应与深响应', () => {
+    it('深响应支持', () => {
+      const original = { foo: { bar: 1 } }
+      const observed = createReactive(original)
+      const fnSpy = vi.fn(() => { observed.foo.bar })
+      createEffect(fnSpy)
+      expect(fnSpy).toBeCalledTimes(1)
+      observed.foo.bar = 2
+      expect(fnSpy).toBeCalledTimes(2)
+    })
+
+    it('浅响应支持', () => {
+      const original = { foo: { bar: 1 } }
+      const shallow = shallowReactive(original)
+      const fnSpy = vi.fn(() => { shallow.foo.bar })
+      createEffect(fnSpy)
+      expect(fnSpy).toBeCalledTimes(1)
+      shallow.foo.bar = 2
+      expect(fnSpy).toBeCalledTimes(1)
+    })
+  })
+
+  suite('只读控制', () => {
+    const original = { foo: 1 }
+    const observed = readonly(original)
+
+    it('修改数据只读提醒', () => {
+      const fnSpy = vi.fn(() => { observed.foo })
+      createEffect(fnSpy)
+      expect(fnSpy).toBeCalledTimes(1)
+      observed.foo = 2
+      expect(fnSpy).toBeCalledTimes(1)
     })
   })
 })

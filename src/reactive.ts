@@ -10,9 +10,30 @@ enum TriggerType {
 const ITERATE_KEY = Symbol('effectKey')
 const RAW = Symbol('raw')
 
-export function createReactive(data: any) {
+export function reactive(data: any) {
+  return createReactive(data, false, false)
+}
+
+export function shallowReactive(data: any) {
+  return createReactive(data, true, false)
+}
+
+export function readonly(data: any) {
+  return createReactive(data, false, true)
+}
+
+export function shallowReadonly(data: any) {
+  return createReactive(data, true, true)
+}
+
+export function createReactive(data: any, isShallow = false, isReadonly = false) {
   return new Proxy(data, {
     set(target, key, newValue, receiver) {
+      if (isReadonly) {
+        console.warn(`属性${String(key)}是只读的`)
+        return true
+      }
+
       const oldValue = Reflect.get(target, key)
       const type = hasOwn(target, key) ? TriggerType.SET : TriggerType.ADD
       const result = Reflect.set(target, key, newValue, receiver)
@@ -29,6 +50,11 @@ export function createReactive(data: any) {
     },
     // delete操作符识别
     deleteProperty(target, property) {
+      if (isReadonly) {
+        console.warn(`属性${String(property)}是只读的`)
+        return true
+      }
+
       // 要删除的属性是否存在
       const hadKey = hasOwn(target, property)
       const res = Reflect.deleteProperty(target, property)
@@ -46,8 +72,22 @@ export function createReactive(data: any) {
       if (key === RAW) {
         return target
       }
-      track(target, key)
-      return Reflect.get(target, key, receiver)
+
+      if (!isReadonly) {
+        track(target, key)
+      }
+
+      const result = Reflect.get(target, key, receiver)
+
+      if (isShallow) {
+        return result
+      }
+
+      if (typeof result === 'object' && result !== null) {
+        return isReadonly ? readonly(result) : reactive(result)
+      }
+
+      return result
     },
     // 对象in操作符识别，基于ECMA-262规范13.10.1节，in操作符的运算结果是基于HasProperty抽象方法获得
     has(target, key) {
